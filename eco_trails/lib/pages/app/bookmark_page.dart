@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:eco_trails/models/place.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -205,11 +206,34 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
                                           topLeft: Radius.circular(12),
                                           bottomLeft: Radius.circular(12),
                                         ),
-                                        child: Image.network(
-                                          placeImage,
+                                        child: CachedNetworkImage(
+                                          imageUrl: placeImage,
                                           width: screenWidth * 0.25,
                                           height: screenWidth * 0.25,
                                           fit: BoxFit.cover,
+                                          placeholder:
+                                              (context, url) => Container(
+                                                width: screenWidth * 0.25,
+                                                height: screenWidth * 0.25,
+                                                color: Colors.grey.shade200,
+                                                child: const Center(
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                ),
+                                              ),
+                                          errorWidget:
+                                              (context, url, error) =>
+                                                  Container(
+                                                    width: screenWidth * 0.25,
+                                                    height: screenWidth * 0.25,
+                                                    color: Colors.grey.shade300,
+                                                    child: const Icon(
+                                                      Icons.broken_image,
+                                                      size: 40,
+                                                    ),
+                                                  ),
                                         ),
                                       ),
                                       SizedBox(width: screenWidth * 0.03),

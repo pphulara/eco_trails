@@ -144,7 +144,11 @@ class TravelScreen extends StatelessWidget {
                   ),
                   GridView.builder(
                     itemCount: place.images.length,
-                    physics: const NeverScrollableScrollPhysics(),
+                    // Make it scrollable
+                    physics:
+                        const BouncingScrollPhysics(), // or ScrollPhysics() for basic
+                    shrinkWrap:
+                        true, // Add this if it's inside a scrollable parent like SingleChildScrollView
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,

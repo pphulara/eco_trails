@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:eco_trails/models/place.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,38 +34,76 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
     }
   }
 
-  void PlanSummary() {
-    final _ = '''
-Trip Duration: $selectedTripDuration
-Trip Date: ${selectedDate.toLocal().toString().split(' ')[0]}
-Group Type: ${isFamily ? 'Family' : 'Solo'}
-Price Range: ₹${price.toStringAsFixed(0)}
+  void planSummary() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("User not logged in")));
+        return;
+      }
 
-Interests: ${interests.entries.where((e) => e.value).map((e) => e.key).join(', ')}
-Adventure Level: $adventureLevel
-Eco Mode: ${ecoModes.entries.firstWhere((e) => e.value, orElse: () => MapEntry('', false)).key}
+      // Construct trip data map
+      final tripData = {
+        'userId': user.uid,
+        'placeId': widget.place.title,
+        'placeTitle': widget.place.title,
+        'selectedTripDuration': selectedTripDuration,
+        'selectedDate': selectedDate.toIso8601String(),
+        'groupType': isFamily ? 'Family' : 'Solo',
+        'price': price,
+        'interests':
+            interests.entries.where((e) => e.value).map((e) => e.key).toList(),
+        'adventureLevel': adventureLevel,
+        'ecoMode':
+            ecoModes.entries
+                .firstWhere(
+                  (e) => e.value,
+                  orElse: () => const MapEntry('', false),
+                )
+                .key,
+        'selectedTransport': selectedTransport,
+        'plasticAvoidance': plasticAvoidance,
+        'ecoHomeStay': ecoHomeStay,
+        'healthNotes': healthController.text,
+        'dietary':
+            dietary.entries
+                .firstWhere(
+                  (e) => e.value,
+                  orElse: () => const MapEntry('', false),
+                )
+                .key,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
-Transport: $selectedTransport
-Avoid Plastic: ${plasticAvoidance ? 'Yes' : 'No'}
-Eco Homestay Rating: $ecoHomeStay
-Health Notes: ${healthController.text}
-Dietary: ${dietary.entries.firstWhere((e) => e.value, orElse: () => MapEntry('', false)).key}
-''';
+      // Save to Firestore
+      await FirebaseFirestore.instance.collection('trips').add(tripData);
 
-    showDialog(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: Text('Trip Planned for ${widget.place.title}'),
-            content: const Text('All preferences saved. Enjoy your journey!'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-    );
+      // Show confirmation dialog
+      showDialog(
+        context: context,
+        builder:
+            (ctx) => AlertDialog(
+              title: Text('Trip Planned for ${widget.place.title}'),
+              content: const Text('All preferences saved. Enjoy your journey!'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    context.go('/home', extra: {'initialTabIndex': 3});
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+      );
+    } catch (e) {
+      print("Error saving trip: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to save trip. Try again.")),
+      );
+    }
   }
 
   // Page 1
@@ -380,7 +420,7 @@ Dietary: ${dietary.entries.firstWhere((e) => e.value, orElse: () => MapEntry('',
                       currentPage == 2
                           ? () {
                             if (validatePage(2)) {
-                              PlanSummary();
+                              planSummary();
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

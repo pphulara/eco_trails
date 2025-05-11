@@ -20,7 +20,7 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int selectedTabIndex = 0;
-  int selectedBottomIndex = 0;
+  int selectedBottomIndex = 3;
   int currentPopularIndex = 0;
   String? currentLocation;
 
@@ -29,6 +29,17 @@ class HomePageState extends State<HomePage> {
   bool isLoading = true;
 
   final PageController _popularListController = PageController();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = GoRouterState.of(context).extra as Map<String, dynamic>?;
+    if (args != null && args.containsKey('initialTabIndex')) {
+      selectedBottomIndex = args['initialTabIndex'];
+    } else {
+      selectedBottomIndex = 0;
+    }
+  }
 
   @override
   void initState() {
@@ -112,7 +123,7 @@ class HomePageState extends State<HomePage> {
   Widget _buildTopBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
-      spacing: MediaQuery.sizeOf(context).width * 0.25,
+      spacing: MediaQuery.sizeOf(context).width * 0.18,
       children: [
         Builder(
           builder:
@@ -126,7 +137,7 @@ class HomePageState extends State<HomePage> {
               ),
         ),
         Text(
-          'Home',
+          'Eco Trails',
           style: GoogleFonts.poppins(
             fontSize: 25,
             fontWeight: FontWeight.bold,

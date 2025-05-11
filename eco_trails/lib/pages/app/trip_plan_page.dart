@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:eco_trails/models/Itinerary.dart';
+import 'package:eco_trails/services/fetch_Itinerary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -13,12 +15,16 @@ class TripPlanPage extends StatefulWidget {
 class _TripPlanPageState extends State<TripPlanPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  List<String> _tabs = ['Over View', 'Day 1', 'Day 2'];
+  late List<String> _tabs = ['Over View'];
+  Map<int, List<ItineraryItem>> dayWiseItinerary = {};
+  bool isLoading = true;
+  String? errorMessage;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length + 1, vsync: this);
+    fetchItinerary();
   }
 
   @override
@@ -27,22 +33,63 @@ class _TripPlanPageState extends State<TripPlanPage>
     super.dispose();
   }
 
-  void _addDay() {
-    final newIndex = _tabController.index;
-    setState(() {
-      int newDay = _tabs.where((t) => t.startsWith('Day')).length + 1;
-      _tabs.insert(_tabs.length, 'Day $newDay');
-      _tabController.dispose();
-      _tabController = TabController(length: _tabs.length + 1, vsync: this);
-      _tabController.index = newIndex;
-    });
+  Future<void> fetchItinerary() async {
+    try {
+      List<ItineraryItem> itineraryItems =
+          await FetchItinerary().fetchItineraryData();
+
+      final Map<int, List<ItineraryItem>> grouped = {};
+      for (var item in itineraryItems) {
+        final dayNumber = int.tryParse(
+          item.day.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
+        if (dayNumber != null) {
+          grouped.putIfAbsent(dayNumber, () => []).add(item);
+        }
+      }
+
+      List<int> sortedDays = grouped.keys.toList()..sort();
+
+      setState(() {
+        dayWiseItinerary = grouped;
+        _tabs = ['Overview'] + sortedDays.map((day) => 'Day $day').toList();
+        isLoading = false;
+      });
+
+      if (mounted) {
+        _tabController = TabController(length: _tabs.length, vsync: this);
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+      });
+    }
   }
+
+  // void _addDay() {
+  //   final newIndex = _tabController.index;
+  //   setState(() {
+  //     int newDay = _tabs.where((t) => t.startsWith('Day')).length + 1;
+  //     _tabs.insert(_tabs.length, 'Day $newDay');
+  //     _tabController.dispose();
+  //     _tabController = TabController(length: _tabs.length + 1, vsync: this);
+  //     _tabController.index = newIndex;
+  //   });
+  // }
 
   @override
   Widget build(BuildContext context) {
     final panelHeight = MediaQuery.of(context).size.height * 0.55;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
+
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (errorMessage != null) {
+      return Center(child: Text('Error: $errorMessage'));
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF93B7AC),
@@ -52,7 +99,7 @@ class _TripPlanPageState extends State<TripPlanPage>
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(35)),
             child: SizedBox.expand(child: MapView()),
           ),
-          const Positioned(top: 50, right: 0, child: LocationInfoBox()),
+          Positioned(top: 50, right: 0, child: LocationInfoBox()),
           Positioned(
             left: 0,
             right: 0,
@@ -81,15 +128,7 @@ class _TripPlanPageState extends State<TripPlanPage>
                           fontWeight: FontWeight.w600,
                         ),
                         indicatorColor: Colors.tealAccent,
-                        tabs: [
-                          ..._tabs.map((t) => Tab(text: t)),
-                          const Tab(icon: Icon(Icons.add)),
-                        ],
-                        onTap: (index) {
-                          if (index == _tabs.length) {
-                            _addDay();
-                          }
-                        },
+                        tabs: [..._tabs.map((t) => Tab(text: t))],
                       ),
                     ),
                     Expanded(
@@ -97,10 +136,11 @@ class _TripPlanPageState extends State<TripPlanPage>
                         controller: _tabController,
                         children: [
                           const OverviewContent(),
-                          ..._tabs
-                              .where((t) => t.startsWith('Day'))
-                              .map((_) => const DayItinerary()),
-                          const SizedBox.shrink(),
+                          ..._tabs.where((t) => t.startsWith('Day')).map((tab) {
+                            final day = int.tryParse(tab.split(' ')[1]) ?? 1;
+                            final items = dayWiseItinerary[day] ?? [];
+                            return DayItinerary(items: items);
+                          }),
                         ],
                       ),
                     ),
@@ -190,7 +230,9 @@ class OverviewContent extends StatelessWidget {
 }
 
 class DayItinerary extends StatelessWidget {
-  const DayItinerary({super.key});
+  final List<ItineraryItem> items;
+
+  const DayItinerary({super.key, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -200,41 +242,22 @@ class DayItinerary extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Flexible(
-                  child: Text(
-                    'April 9',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            PlaceCard(
-              imageUrl: 'assets/places/ranikhet.jpg',
-              type: 'Mountain',
-              name: 'Khali Top',
-              rating: 4.8,
-              price: 500,
-              distance: '3.9 km',
-              time: '30 min',
-            ),
-            const SizedBox(height: 12),
-            PlaceCard(
-              imageUrl: 'assets/places/ranikhet.jpg',
-              type: 'Temple',
-              name: 'Nanda Devi Temple',
-              rating: 4.8,
-              price: 500,
-              distance: '3.9 km',
-              time: '30 min',
-            ),
-          ],
+          children:
+              items.map((item) {
+                return Column(
+                  children: [
+                    Text(
+                      '${item.locationName} (${item.type})',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text('Budget: ₹${item.budgetEstimate}'),
+                    const Divider(),
+                  ],
+                );
+              }).toList(),
         ),
       ),
     );

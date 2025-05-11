@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:eco_trails/models/place.dart';
 import 'package:flutter/cupertino.dart';
@@ -170,7 +171,7 @@ class CategoryPageState extends State<CategoryPage> {
         child: Column(
           children: [
             Text(
-              'Search',
+              'Eco Trails',
               style: GoogleFonts.poppins(
                 fontSize: 25,
                 fontWeight: FontWeight.bold,
@@ -297,21 +298,32 @@ class CategoryPageState extends State<CategoryPage> {
                                 children: [
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      imageUrl,
+                                    child: CachedNetworkImage(
+                                      imageUrl: imageUrl,
                                       width: 150,
                                       height: 100,
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              Container(
-                                                width: 150,
-                                                height: 100,
-                                                color: Colors.grey[300],
-                                                child: const Icon(
-                                                  Icons.image_not_supported,
-                                                ),
+                                      placeholder:
+                                          (context, url) => Container(
+                                            width: 150,
+                                            height: 100,
+                                            color: Colors.grey.shade200,
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
                                               ),
+                                            ),
+                                          ),
+                                      errorWidget:
+                                          (context, url, error) => Container(
+                                            width: 150,
+                                            height: 100,
+                                            color: Colors.grey.shade300,
+                                            child: const Icon(
+                                              Icons.broken_image,
+                                              size: 40,
+                                            ),
+                                          ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
