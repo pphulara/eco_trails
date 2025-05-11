@@ -15,7 +15,7 @@ class TripPlanPage extends StatefulWidget {
 class _TripPlanPageState extends State<TripPlanPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  late List<String> _tabs = ['Over View'];
+  late List<String> _tabs = [];
   Map<int, List<ItineraryItem>> dayWiseItinerary = {};
   bool isLoading = true;
   String? errorMessage;
@@ -52,7 +52,7 @@ class _TripPlanPageState extends State<TripPlanPage>
 
       setState(() {
         dayWiseItinerary = grouped;
-        _tabs = ['Overview'] + sortedDays.map((day) => 'Day $day').toList();
+        _tabs = sortedDays.map((day) => 'Day $day').toList();
         isLoading = false;
       });
 
@@ -135,7 +135,6 @@ class _TripPlanPageState extends State<TripPlanPage>
                       child: TabBarView(
                         controller: _tabController,
                         children: [
-                          const OverviewContent(),
                           ..._tabs.where((t) => t.startsWith('Day')).map((tab) {
                             final day = int.tryParse(tab.split(' ')[1]) ?? 1;
                             final items = dayWiseItinerary[day] ?? [];
@@ -150,80 +149,6 @@ class _TripPlanPageState extends State<TripPlanPage>
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class OverviewContent extends StatelessWidget {
-  const OverviewContent({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Container(
-        color: const Color(0xFFCADCD6),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'MUNICH ►',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF264653),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Munsiyari is a picturesque hill station in Uttarakhand, nestled in the Kumaon Himalayas, known for its stunning views of the Panchachuli peaks.',
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text('4 Days Trip ⏱', style: TextStyle(fontSize: 16)),
-                Row(children: [Icon(Icons.person, size: 18), Text(" Solo")]),
-                Row(children: [Icon(Icons.no_food, size: 18), Text(" Veg")]),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 18),
-                const SizedBox(width: 8),
-                Text(DateFormat('dd-MM-yyyy').format(DateTime.now())),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: const [
-                Icon(Icons.sunny, size: 28),
-                SizedBox(width: 8),
-                Text("23° sunny", style: TextStyle(fontSize: 18)),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF264653),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                ),
-                child: const Text(
-                  "Cancel Trip",
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
