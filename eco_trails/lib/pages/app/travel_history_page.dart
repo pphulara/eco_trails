@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 class TravelHistoryPage extends StatefulWidget {
   const TravelHistoryPage({super.key});
@@ -20,38 +21,117 @@ class _TravelHistoryPageState extends State<TravelHistoryPage> {
   }
 
   Widget _buildTripCard(Map<String, dynamic> tripData) {
-    final title = tripData['title'] ?? 'Untitled Trip';
-    final date = tripData['date'] ?? '';
+    final title = tripData['placeTitle'] ?? 'Untitled Trip';
+    final Timestamp? timestamp = tripData['createdAt'];
+    final String date =
+        timestamp != null
+            ? DateFormat('MMM dd, yyyy – kk:mm').format(timestamp.toDate())
+            : 'Date not available';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 4,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 6,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE3F2FD), Color(0xFFFFFFFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title & Date
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 18,
-                    color: Colors.black,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(date),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(date, style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
               ],
             ),
-          ),
-        ],
+            const Divider(height: 24, thickness: 1),
+
+            // Basic Info
+            Row(
+              children: [
+                const Icon(Icons.group, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text("Group: ${tripData['groupType']}"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.directions_car, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text("Transport: ${tripData['selectedTransport']}"),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time, color: Colors.teal),
+                const SizedBox(width: 8),
+                Text("Duration: ${tripData['selectedTripDuration']}"),
+              ],
+            ),
+
+            const Divider(height: 24, thickness: 1),
+
+            // Preferences
+            Text(
+              "Preferences",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text("Dietary: ${tripData['dietary']}"),
+            Text("Eco Mode: ${tripData['ecoMode']}"),
+            Text("Eco Home Stay: ${tripData['ecoHomeStay']}"),
+            Text(
+              "Plastic Avoidance: ${tripData['plasticAvoidance'] ? 'Yes' : 'No'}",
+            ),
+            Text("Adventure Level: ${tripData['adventureLevel']}"),
+
+            if ((tripData['healthNotes'] as String?)?.isNotEmpty ?? false) ...[
+              const SizedBox(height: 8),
+              Text("Health Notes: ${tripData['healthNotes']}"),
+            ],
+
+            const Divider(height: 24, thickness: 1),
+
+            // Interests & Cost
+            Text("Interests: ${tripData['interests']?.join(', ') ?? 'None'}"),
+            const SizedBox(height: 8),
+            Text(
+              "Cost: ₹${tripData['price']}",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -64,14 +144,18 @@ class _TravelHistoryPageState extends State<TravelHistoryPage> {
         backgroundColor: const Color(0xFFD1E0DC),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Color.fromRGBO(111, 119, 137, 1),
+            size: 30,
+          ),
           onPressed: () => context.go('/home'),
         ),
         title: const Text(
           "Travel History",
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
+            color: Color.fromRGBO(111, 119, 137, 1),
+            fontSize: 30,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -81,14 +165,9 @@ class _TravelHistoryPageState extends State<TravelHistoryPage> {
         stream:
             FirebaseFirestore.instance
                 .collection('trips')
-                .where(
-                  'userId',
-                  isEqualTo: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(currentUserId),
-                )
-                .orderBy('date', descending: true)
+                .where('userId', isEqualTo: currentUserId)
                 .snapshots(),
+
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
