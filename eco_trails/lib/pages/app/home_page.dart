@@ -71,59 +71,78 @@ class HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    double deviceWidth = MediaQuery.sizeOf(context).width;
+    // Get screen size metrics
+    final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       drawer: const AppDrawer(),
       backgroundColor: const Color.fromRGBO(201, 219, 213, 1),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildPageContent(deviceWidth),
+      body: SafeArea(
+        child:
+            isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildPageContent(screenSize),
+      ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
 
-  Widget _buildPageContent(double deviceWidth) {
+  Widget _buildPageContent(Size screenSize) {
     if (selectedBottomIndex == 1) return const CategoryPage();
     if (selectedBottomIndex == 2) return MapScreen();
     if (selectedBottomIndex == 3) return TripPlanPage();
-    return _buildHomeContent(deviceWidth);
+    return _buildHomeContent(screenSize);
   }
 
-  Widget _buildHomeContent(double deviceWidth) {
+  Widget _buildHomeContent(Size screenSize) {
     List<Place> displayedList =
         selectedTabIndex == 0 ? popularPlaces : hiddenGems;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: deviceWidth * 0.05),
+      padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.05),
       child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 30),
-            _buildTopBar(),
-            const SizedBox(height: 30),
-            _buildLocationRow(),
-            const SizedBox(height: 30),
-            _buildTabs(),
-            const SizedBox(height: 16),
-            selectedTabIndex == 0
-                ? _buildPopularList(deviceWidth)
-                : Column(
-                  children: displayedList.map(buildVerticalCard).toList(),
-                ),
-          ],
+        physics: const BouncingScrollPhysics(),
+        child: ConstrainedBox(
+          // This ensures the column takes at least the full screen height
+          constraints: BoxConstraints(
+            minHeight:
+                screenSize.height -
+                MediaQuery.of(context).padding.top -
+                MediaQuery.of(context).padding.bottom -
+                80, // Accounting for bottom nav
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              _buildTopBar(screenSize),
+              const SizedBox(height: 20),
+              _buildLocationRow(),
+              const SizedBox(height: 20),
+              _buildTabs(),
+              const SizedBox(height: 16),
+              selectedTabIndex == 0
+                  ? _buildPopularList(screenSize)
+                  : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: displayedList.length,
+                    itemBuilder:
+                        (context, index) =>
+                            buildVerticalCard(displayedList[index], screenSize),
+                  ),
+              // Add extra padding at the bottom to avoid content being hidden by bottom nav
+              SizedBox(height: screenSize.height * 0.02),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(Size screenSize) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      spacing: MediaQuery.sizeOf(context).width * 0.18,
       children: [
         Builder(
           builder:
@@ -136,10 +155,11 @@ class HomePageState extends State<HomePage> {
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
         ),
+        const SizedBox(width: 16), // Fixed spacing
         Text(
           'Eco Trails',
           style: GoogleFonts.poppins(
-            fontSize: 25,
+            fontSize: screenSize.width < 360 ? 20 : 25, // Responsive font size
             fontWeight: FontWeight.bold,
             color: const Color.fromRGBO(111, 119, 137, 1),
           ),
@@ -162,6 +182,8 @@ class HomePageState extends State<HomePage> {
                 fontWeight: FontWeight.w600,
                 fontSize: 15,
               ),
+              overflow: TextOverflow.ellipsis, // Prevent text overflow
+              maxLines: 1,
             ),
           ),
         ],
@@ -205,14 +227,17 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildPopularList(double deviceWidth) {
+  Widget _buildPopularList(Size screenSize) {
     List<Place> displayedList = popularPlaces;
+
+    // Calculate adaptive height based on screen size
+    final listHeight = screenSize.height * 0.28;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.3,
+          height: listHeight,
           child: PageView.builder(
             controller: _popularListController,
             itemCount: displayedList.length,
@@ -220,17 +245,17 @@ class HomePageState extends State<HomePage> {
                 (index) => setState(() => currentPopularIndex = index),
             itemBuilder:
                 (context, index) =>
-                    buildHorizontalCard(displayedList[index], deviceWidth),
+                    buildHorizontalCard(displayedList[index], screenSize),
           ),
         ),
         const SizedBox(height: 16),
         _buildPageIndicators(displayedList.length),
-        const SizedBox(height: 30),
+        const SizedBox(height: 24),
         Text(
           'Crowd Insights',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 22),
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         ...displayedList.map(
           (place) => buildCrowdBar(place.title, place.crowd),
         ),
@@ -298,32 +323,38 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Widget buildHorizontalCard(Place place, double screenWidth) {
+  Widget buildHorizontalCard(Place place, Size screenSize) {
+    // Calculate adaptive dimensions
+    final cardWidth = screenSize.width * 0.8;
+    final imageHeight = screenSize.height * 0.18;
+
     return GestureDetector(
       onTap: () {
         GoRouter.of(context).go('/place', extra: place);
       },
       child: Container(
-        width: screenWidth * 0.6,
-        margin: const EdgeInsets.only(right: 5, left: 5),
+        width: cardWidth,
+        margin: const EdgeInsets.symmetric(horizontal: 5),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 255, 255, 255),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color.fromARGB(255, 38, 70, 83)),
+          border: Border.all(color: const Color.fromARGB(255, 38, 70, 83)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               child: CachedNetworkImage(
                 imageUrl: place.images[0],
                 fit: BoxFit.cover,
-                height: MediaQuery.sizeOf(context).height * 0.2,
+                height: imageHeight,
                 width: double.infinity,
                 placeholder:
                     (context, url) => Container(
-                      height: MediaQuery.sizeOf(context).height * 0.2,
+                      height: imageHeight,
                       width: double.infinity,
                       color: Colors.grey.shade200,
                       child: const Center(
@@ -332,7 +363,7 @@ class HomePageState extends State<HomePage> {
                     ),
                 errorWidget:
                     (context, url, error) => Container(
-                      height: MediaQuery.sizeOf(context).height * 0.2,
+                      height: imageHeight,
                       width: double.infinity,
                       color: Colors.grey.shade300,
                       child: const Icon(Icons.broken_image, size: 40),
@@ -344,45 +375,48 @@ class HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        place.title,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.5,
-                          color: Colors.black,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          place.title,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                      ),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.blueGrey,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            place.location.toString(),
-                            style: GoogleFonts.poppins(
-                              color: Colors.black,
-                              fontSize: 10.5,
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: Colors.blueGrey,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                place.location.toString(),
+                                style: GoogleFonts.poppins(fontSize: 10.5),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   Column(
                     children: [
-                      Icon(Icons.star, color: Colors.amber, size: 20),
+                      const Icon(Icons.star, color: Colors.amber, size: 20),
                       Text(
                         '4.8',
                         style: GoogleFonts.poppins(
                           fontSize: 13.5,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
                         ),
                       ),
                     ],
@@ -396,19 +430,23 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Widget buildVerticalCard(Place place) {
+  Widget buildVerticalCard(Place place, Size screenSize) {
+    // Calculate adaptive height
+    final cardHeight = screenSize.height * 0.27;
+    final imageHeight = cardHeight * 0.65;
+
     return GestureDetector(
       onTap: () {
         GoRouter.of(context).go('/place', extra: place);
       },
       child: Container(
-        height: MediaQuery.sizeOf(context).height * 0.3,
-        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+        height: cardHeight,
+        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 5),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 255, 255, 255),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Color.fromARGB(255, 38, 70, 83)),
-          boxShadow: [
+          border: Border.all(color: const Color.fromARGB(255, 38, 70, 83)),
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
               blurRadius: 4,
@@ -420,18 +458,18 @@ class HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
               ),
               child: CachedNetworkImage(
                 imageUrl: place.images[0],
                 fit: BoxFit.cover,
-                height: MediaQuery.sizeOf(context).height * 0.2,
+                height: imageHeight,
                 width: double.infinity,
                 placeholder:
                     (context, url) => Container(
-                      height: MediaQuery.sizeOf(context).height * 0.2,
+                      height: imageHeight,
                       width: double.infinity,
                       color: Colors.grey.shade200,
                       child: const Center(
@@ -440,77 +478,84 @@ class HomePageState extends State<HomePage> {
                     ),
                 errorWidget:
                     (context, url, error) => Container(
-                      height: MediaQuery.sizeOf(context).height * 0.2,
+                      height: imageHeight,
                       width: double.infinity,
                       color: Colors.grey.shade300,
                       child: const Icon(Icons.broken_image, size: 40),
                     ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          place.title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            place.title,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                        ),
-                        SizedBox(height: 4),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: Colors.blueGrey,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  place.location.toString(),
+                                  style: GoogleFonts.poppins(fontSize: 10.5),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 12,
-                              color: Colors.blueGrey,
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 18,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 2),
                             Text(
-                              place.location.toString(),
+                              '4.5',
                               style: GoogleFonts.poppins(
-                                color: Colors.black,
-                                fontSize: 10.5,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 8),
+                        const Icon(
+                          Icons.bookmark_border,
+                          size: 20,
+                          color: Colors.black54,
+                        ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.star, color: Colors.amber, size: 18),
-                          SizedBox(width: 2),
-                          Text(
-                            '4.5',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Icon(
-                        Icons.bookmark_border,
-                        size: 20,
-                        color: Colors.black54,
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -531,8 +576,9 @@ class HomePageState extends State<HomePage> {
               style: GoogleFonts.poppins(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
-                color: Colors.black,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
           Expanded(
@@ -558,12 +604,12 @@ class HomePageState extends State<HomePage> {
               ],
             ),
           ),
+          const SizedBox(width: 4),
           Text(
             '$percent%',
             style: GoogleFonts.poppins(
               fontWeight: FontWeight.w500,
               fontSize: 13.5,
-              color: Colors.black,
             ),
           ),
         ],

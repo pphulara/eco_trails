@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,16 +27,15 @@ class _TripPlanPageState extends State<TripPlanPage>
   Future<void> fetchTodayTrip() async {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final snapshot =
         await FirebaseFirestore.instance
             .collection('trips')
+            .orderBy('createdAt', descending: true)
             .where(
               'selectedDate',
               isGreaterThanOrEqualTo: startOfDay.toIso8601String(),
             )
-            .where('selectedDate', isLessThan: endOfDay.toIso8601String())
             .limit(1)
             .get();
 
@@ -157,18 +157,23 @@ class FirebaseTripsPage extends StatelessWidget {
 
     return Container(
       color: const Color.fromRGBO(201, 219, 213, 1),
-      child: FutureBuilder<DocumentSnapshot>(
+      child: FutureBuilder<QuerySnapshot>(
         future:
-            FirebaseFirestore.instance.collection('places').doc(placeId).get(),
-        builder: (context, placeSnapshot) {
-          if (placeSnapshot.connectionState == ConnectionState.waiting) {
+            FirebaseFirestore.instance
+                .collection('places')
+                .where('name', isEqualTo: placeId)
+                .limit(1)
+                .get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!placeSnapshot.hasData || !placeSnapshot.data!.exists) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text("Place data not found."));
           }
 
-          final placeData = placeSnapshot.data!.data() as Map<String, dynamic>;
+          final placeData =
+              snapshot.data!.docs.first.data() as Map<String, dynamic>;
           final images = placeData['multiple images'] ?? [];
           final firstImageUrl = images.isNotEmpty ? images[0] : null;
 
@@ -188,11 +193,30 @@ class FirebaseTripsPage extends StatelessWidget {
                         topLeft: Radius.circular(12),
                         topRight: Radius.circular(12),
                       ),
-                      child: Image.network(
-                        firstImageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl: firstImageUrl,
                         width: double.infinity,
                         height: 250,
                         fit: BoxFit.cover,
+                        placeholder:
+                            (context, url) => Container(
+                              width: double.infinity,
+                              height: 250,
+                              color: Colors.grey[300],
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                        errorWidget: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: 250,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: Icon(Icons.image_not_supported, size: 50),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   const SizedBox(height: 8),
@@ -224,7 +248,7 @@ class FirebaseTripsPage extends StatelessWidget {
                               "Budget: ₹${data['price']}",
                               style: const TextStyle(
                                 fontSize: 18.0,
-                                color: Colors.green,
+                                color: Color.fromARGB(255, 1, 90, 92),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -256,10 +280,6 @@ class FirebaseTripsPage extends StatelessWidget {
                         const Divider(),
                         Text(
                           "Adventure Level: ${data['adventureLevel']}",
-                          style: const TextStyle(fontSize: 16.0),
-                        ),
-                        Text(
-                          "Dietary Preferences: ${data['dietary']}",
                           style: const TextStyle(fontSize: 16.0),
                         ),
                         Text(
@@ -316,20 +336,40 @@ class _ApiItineraryPageState extends State<ApiItineraryPage> {
     final tripData = widget.tripDoc.data() as Map<String, dynamic>;
 
     try {
+      // Updated API endpoint - replace this with your actual working API endpoint
+      final apiUrl =
+          'https://9827-35-185-96-71.ngrok-free.app/generate-itinerary';
+
+      // Improved logging for debugging
+      print('Sending request to: $apiUrl');
+      print(
+        'Request payload: ${jsonEncode({
+          "mode": tripData['mode'] ?? "uttarakhand",
+          "selected_city": tripData['placeTitle'] ?? "Rishikesh",
+          "trip_duration_days": tripData['selectedTripDuration'] ?? 3,
+          "group_type": tripData['groupType'] ?? "family",
+          "preferences": tripData['interests'] ?? [], // Fixed: Changed from preferences to interests
+          "budget_per_day": tripData['price'] ?? 2000,
+        })}',
+      );
+
       final response = await http.post(
-        Uri.parse(
-          'https://1322-35-196-109-33.ngrok-free.app/generate-itinerary',
-        ),
+        Uri.parse(apiUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           "mode": tripData['mode'] ?? "uttarakhand",
           "selected_city": tripData['placeTitle'] ?? "Rishikesh",
           "trip_duration_days": tripData['selectedTripDuration'] ?? 3,
           "group_type": tripData['groupType'] ?? "family",
-          "preferences": tripData['preferences'] ?? ["nature"],
+          "preferences":
+              tripData['interests'] ??
+              [], // Fixed: Changed from preferences to interests
           "budget_per_day": tripData['price'] ?? 2000,
         }),
       );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -339,18 +379,20 @@ class _ApiItineraryPageState extends State<ApiItineraryPage> {
           });
         } else {
           setState(() {
-            errorMessage = "Unexpected data format.";
+            errorMessage = "Unexpected data format: ${response.body}";
           });
         }
       } else {
         setState(() {
           errorMessage =
-              "Failed to load itinerary. Error ${response.statusCode}";
+              "Failed to load itinerary. Status Code: ${response.statusCode}, Response: ${response.body}";
         });
       }
     } catch (e) {
+      print('Exception caught: $e');
       setState(() {
-        errorMessage = "Exception: $e";
+        errorMessage =
+            "Connection error: $e. Please check your internet connection and try again.";
       });
     } finally {
       setState(() {
@@ -367,9 +409,72 @@ class _ApiItineraryPageState extends State<ApiItineraryPage> {
           isLoading
               ? const Center(child: CircularProgressIndicator())
               : errorMessage != null
-              ? Center(child: Text(errorMessage!))
-              : itineraryData == null
-              ? const Center(child: Text("No data available."))
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Error loading itinerary",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[700],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Text(
+                        errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: fetchTripAndItinerary,
+                      child: const Text("Try Again"),
+                    ),
+                  ],
+                ),
+              )
+              : itineraryData == null || itineraryData!.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      color: Color.fromARGB(255, 0, 0, 0),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "No itinerary data available",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "We couldn't generate an itinerary for your trip.",
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: fetchTripAndItinerary,
+                      child: const Text("Generate Itinerary"),
+                    ),
+                  ],
+                ),
+              )
               : ListView.builder(
                 itemCount: itineraryData?.length ?? 0,
                 itemBuilder: (context, index) {

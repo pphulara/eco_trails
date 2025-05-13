@@ -7,7 +7,7 @@ class FetchItinerary {
     try {
       final response = await http.post(
         Uri.parse(
-          'https://1322-35-196-109-33.ngrok-free.app/generate-itinerary',
+          'https://9827-35-185-96-71.ngrok-free.app/generate-itinerary',
         ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({

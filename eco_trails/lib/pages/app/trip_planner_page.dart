@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 class TripPlannerPage extends StatefulWidget {
   final Place place;
-
   const TripPlannerPage({super.key, required this.place});
 
   @override
@@ -17,18 +16,15 @@ class TripPlannerPage extends StatefulWidget {
 class _TripPlannerPageState extends State<TripPlannerPage> {
   final PageController _controller = PageController();
   int currentPage = 0;
+
   bool validatePage(int page) {
     switch (page) {
       case 0:
-        return selectedTripDuration.isNotEmpty && (isFamily || isSolo);
+        return selectedTripDuration.isNotEmpty &&
+            (isFamily || isSolo || isFriends) &&
+            price > 0;
       case 1:
-        return interests.containsValue(true) &&
-            adventureLevel > 0 &&
-            ecoModes.containsValue(true);
-      case 2:
-        return selectedTransport.isNotEmpty &&
-            ecoHomeStay > 0 &&
-            dietary.containsValue(true);
+        return interests.containsValue(true) && adventureLevel > 0;
       default:
         return false;
     }
@@ -44,43 +40,31 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
         return;
       }
 
-      // Construct trip data map
       final tripData = {
         'userId': user.uid,
         'placeId': widget.place.title,
         'placeTitle': widget.place.title,
         'selectedTripDuration': selectedTripDuration,
         'selectedDate': selectedDate.toIso8601String(),
-        'groupType': isFamily ? 'Family' : 'Solo',
+        'groupType':
+            isFamily
+                ? 'Family'
+                : isSolo
+                ? 'Solo'
+                : 'Friends',
         'price': price,
         'interests':
             interests.entries.where((e) => e.value).map((e) => e.key).toList(),
         'adventureLevel': adventureLevel,
-        'ecoMode':
-            ecoModes.entries
-                .firstWhere(
-                  (e) => e.value,
-                  orElse: () => const MapEntry('', false),
-                )
-                .key,
         'selectedTransport': selectedTransport,
         'plasticAvoidance': plasticAvoidance,
         'ecoHomeStay': ecoHomeStay,
         'healthNotes': healthController.text,
-        'dietary':
-            dietary.entries
-                .firstWhere(
-                  (e) => e.value,
-                  orElse: () => const MapEntry('', false),
-                )
-                .key,
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': DateTime.now(),
       };
 
-      // Save to Firestore
       await FirebaseFirestore.instance.collection('trips').add(tripData);
 
-      // Show confirmation dialog
       showDialog(
         context: context,
         builder:
@@ -111,7 +95,8 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
   DateTime selectedDate = DateTime.now();
   bool isFamily = false;
   bool isSolo = false;
-  double price = 2000;
+  bool isFriends = false;
+  double price = 0;
 
   // Page 2
   Map<String, bool> interests = {
@@ -119,25 +104,15 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
     'Culture & Heritage': false,
     'Spirituality': false,
     'Photography': false,
+    'Hiking': false,
+    'Peace': false,
   };
   double adventureLevel = 1;
-  Map<String, bool> ecoModes = {
-    'Eco Max': false,
-    'Balance': false,
-    'Comfort': false,
-  };
 
-  // Page 3
   String selectedTransport = 'Car';
   bool plasticAvoidance = true;
-  double ecoHomeStay = 1;
+  bool ecoHomeStay = false;
   final TextEditingController healthController = TextEditingController();
-  Map<String, bool> dietary = {
-    'Vegan': false,
-    'Vegetarian': false,
-    'Non-Vegetarian': false,
-    'Other': false,
-  };
 
   void nextPage() {
     if (validatePage(currentPage)) {
@@ -161,28 +136,52 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
     }
   }
 
-  Widget detailContainer({required String title, required Widget child}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2F1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 225, 251, 244),
+      body: Padding(
+        padding: const EdgeInsets.only(top: 25.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                IconButton(
+                  onPressed:
+                      currentPage > 0
+                          ? previousPage
+                          : () => context.go('/place', extra: widget.place),
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                Text(
+                  'Planner',
+                  style: GoogleFonts.poppins(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromRGBO(111, 119, 137, 1),
+                  ),
+                ),
+                currentPage == 0
+                    ? TextButton(
+                      onPressed: nextPage,
+                      child: Text(
+                        'Next',
+                        style: GoogleFonts.poppins(fontSize: 16),
+                      ),
+                    )
+                    : const SizedBox(width: 60),
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
-          child,
-        ],
+            Expanded(
+              child: PageView(
+                controller: _controller,
+                onPageChanged: (i) => setState(() => currentPage = i),
+                children: [page1(), page2()],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,49 +192,41 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
         title: 'Trip Duration',
         child: dropdownTile(
           '',
-          ['1 Day', '4 Day', '7 Day'],
+          ['1 Day', '2 Day', '3 Day', '4 Day', '5 Day', '6 Day', '7 Day'],
           selectedTripDuration,
           (val) => setState(() => selectedTripDuration = val),
         ),
       ),
       detailContainer(
         title: 'Trip Date',
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              onPrimary: Color.fromARGB(255, 0, 191, 255),
-              primary: Color.fromARGB(204, 255, 255, 255),
-            ),
-          ),
-          child: CalendarDatePicker(
-            initialDate: selectedDate,
-            firstDate: DateTime.now(),
-            lastDate: DateTime(2027),
-            onDateChanged: (picked) {
-              setState(() {
-                selectedDate = picked;
-              });
-            },
-          ),
+        child: CalendarDatePicker(
+          initialDate: selectedDate,
+          firstDate: DateTime.now(),
+          lastDate: DateTime(2027),
+          onDateChanged: (picked) => setState(() => selectedDate = picked),
         ),
       ),
-
       detailContainer(
         title: 'Group Type',
-        child: Wrap(
-          spacing: 10,
+        child: Column(
           children:
-              ['Family', 'Solo'].map((option) {
-                bool isSelected =
-                    (option == 'Family' && isFamily) ||
-                    (option == 'Solo' && isSolo);
-                return ChoiceChip(
-                  label: Text(option, style: GoogleFonts.poppins()),
-                  selected: isSelected,
-                  onSelected: (_) {
+              ['Family', 'Solo', 'Friends'].map((option) {
+                return RadioListTile(
+                  title: Text(option),
+                  value: option,
+                  groupValue:
+                      isFamily
+                          ? 'Family'
+                          : isSolo
+                          ? 'Solo'
+                          : isFriends
+                          ? 'Friends'
+                          : '',
+                  onChanged: (val) {
                     setState(() {
-                      isFamily = option == 'Family';
-                      isSolo = option == 'Solo';
+                      isFamily = val == 'Family';
+                      isSolo = val == 'Solo';
+                      isFriends = val == 'Friends';
                     });
                   },
                 );
@@ -243,13 +234,18 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
         ),
       ),
       detailContainer(
-        title: 'Price Range',
-        child: sliderTile(
-          "Rs",
-          price,
-          0,
-          10000,
-          (val) => setState(() => price = val),
+        title: 'Budget (Rs)',
+        child: TextField(
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: 'Enter your budget',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (val) {
+            setState(() {
+              price = double.tryParse(val) ?? 0;
+            });
+          },
         ),
       ),
     ]);
@@ -258,202 +254,82 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
   Widget page2() {
     return plannerCard([
       detailContainer(
-        title: 'Interest',
-        child: checkboxList(
-          'Interest',
-          interests,
-          (label, value) => setState(() => interests[label] = value),
-        ),
-      ),
-      const SizedBox(height: 8),
-      detailContainer(
-        title: 'Adventure Level',
-        child: Wrap(
-          spacing: 10,
-          children: List.generate(5, (index) {
-            final level = index + 1;
-            return ChoiceChip(
-              label: Text(level.toString()),
-              selected: adventureLevel == level.toDouble(),
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => adventureLevel = level.toDouble());
-                }
-              },
-            );
-          }),
-        ),
-      ),
-      const SizedBox(height: 8),
-      detailContainer(
-        title: 'Eco Mode',
-        child: Wrap(
-          spacing: 10,
+        title: 'Preferences',
+        child: Column(
           children:
-              ecoModes.keys.map((mode) {
-                return ChoiceChip(
-                  label: Text(mode),
-                  selected: ecoModes[mode] == true,
-                  onSelected: (_) {
-                    setState(() {
-                      ecoModes.updateAll((key, value) => false);
-                      ecoModes[mode] = true;
-                    });
-                  },
+              interests.keys.map((key) {
+                return CheckboxListTile(
+                  title: Text(key),
+                  value: interests[key],
+                  onChanged: (val) => setState(() => interests[key] = val!),
                 );
               }).toList(),
         ),
       ),
-    ]);
-  }
-
-  Widget page3() {
-    return plannerCard([
-      detailContainer(
-        title: 'Transport Mode',
-        child: Wrap(
-          spacing: 10,
-          children:
-              ['Car', 'Bus', 'Bike'].map((mode) {
-                return ChoiceChip(
-                  label: Text(mode),
-                  selected: selectedTransport == mode,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() => selectedTransport = mode);
-                    }
-                  },
-                );
-              }).toList(),
-        ),
-      ),
-      const SizedBox(height: 8),
       detailContainer(
         title: 'Plastic Avoidance',
         child: SwitchListTile(
-          title: const Text('Avoid Plastic Usage'),
+          title: const Text('Plastic Avoidance'),
           value: plasticAvoidance,
           onChanged: (val) => setState(() => plasticAvoidance = val),
         ),
       ),
-      const SizedBox(height: 8),
       detailContainer(
-        title: 'Eco Homestays',
-        child: Wrap(
-          spacing: 10,
-          children: List.generate(5, (index) {
-            final level = index + 1;
-            return ChoiceChip(
-              label: Text(level.toString()),
-              selected: ecoHomeStay == level.toDouble(),
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => ecoHomeStay = level.toDouble());
-                }
-              },
-            );
-          }),
+        title: 'Adventure Level',
+        child: sliderTile(
+          'Level',
+          adventureLevel,
+          1,
+          5,
+          (val) => setState(() => adventureLevel = val),
         ),
       ),
-      const SizedBox(height: 8),
       detailContainer(
-        title: 'Health Condition',
-        child: textFieldTile('Health Notes', healthController),
-      ),
-      const SizedBox(height: 8),
-      detailContainer(
-        title: 'Dietary Preference',
-        child: Wrap(
-          spacing: 10,
+        title: 'Transport Mode',
+        child: Column(
           children:
-              dietary.keys.map((diet) {
-                return ChoiceChip(
-                  label: Text(diet),
-                  selected: dietary[diet] == true,
-                  onSelected: (selected) {
-                    setState(() {
-                      dietary.updateAll((key, value) => false);
-                      dietary[diet] = selected;
-                    });
-                  },
+              ['Public', 'Private'].map((mode) {
+                return RadioListTile(
+                  title: Text(mode),
+                  value: mode,
+                  groupValue: selectedTransport,
+                  onChanged: (val) => setState(() => selectedTransport = val!),
                 );
               }).toList(),
         ),
       ),
-    ]);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 225, 251, 244),
-      body: Padding(
-        padding: const EdgeInsets.only(top: 25.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                currentPage > 0
-                    ? IconButton(
-                      onPressed: previousPage,
-                      icon: const Icon(Icons.arrow_back),
-                    )
-                    : IconButton(
-                      onPressed: () {
-                        (context).go('/place', extra: widget.place);
-                      },
-                      icon: Icon(Icons.arrow_back),
-                    ),
-                Text(
-                  'Planner',
-                  style: GoogleFonts.poppins(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromRGBO(111, 119, 137, 1),
-                  ),
-                ),
-                TextButton(
-                  onPressed:
-                      currentPage == 2
-                          ? () {
-                            if (validatePage(2)) {
-                              planSummary();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please complete all fields'),
-                                ),
-                              );
-                            }
-                          }
-                          : nextPage,
-
-                  child: Row(
-                    children: [
-                      Text(
-                        currentPage == 2 ? 'Submit' : 'Next',
-                        style: GoogleFonts.poppins(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            Expanded(
-              child: PageView(
-                controller: _controller,
-                onPageChanged: (i) => setState(() => currentPage = i),
-                children: [page1(), page2(), page3()],
-              ),
-            ),
-          ],
+      detailContainer(
+        title: 'Homestays',
+        child: SwitchListTile(
+          title: const Text('Homestays Available'),
+          value: ecoHomeStay,
+          onChanged: (val) => setState(() => ecoHomeStay = val),
         ),
       ),
-    );
+      detailContainer(
+        title: 'Health Condition',
+        child: textFieldTile('Health Notes', healthController),
+      ),
+      const SizedBox(height: 20),
+      ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        ),
+        onPressed: () {
+          if (validatePage(1)) {
+            planSummary();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please complete all fields')),
+            );
+          }
+        },
+        child: const Text('Submit'),
+      ),
+    ]);
   }
 
   Widget plannerCard(List<Widget> children) {
@@ -468,67 +344,43 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
     );
   }
 
+  Widget detailContainer({required String title, required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2F1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+
   Widget dropdownTile(
     String label,
     List<String> items,
     String value,
     Function(String) onChanged,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        DropdownButton<String>(
-          isExpanded: true,
-          value: value,
-          items:
-              items
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
-          onChanged: (v) => onChanged(v!),
-        ),
-      ],
-    );
-  }
-
-  Widget tileWithButton(
-    String title,
-    String value,
-    Future<void> Function() onPressed,
-  ) {
-    return ListTile(
-      title: Text(title),
-      subtitle: Text(value),
-      trailing: ElevatedButton(
-        onPressed: onPressed, // now accepts async
-        child: Text('Select'),
-      ),
-    );
-  }
-
-  Widget toggleCheckbox(
-    String label,
-    Map<String, bool> options,
-    Function(String, bool) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        Wrap(
-          spacing: 10,
-          children:
-              options.entries
-                  .map(
-                    (e) => FilterChip(
-                      label: Text(e.key),
-                      selected: e.value,
-                      onSelected: (val) => onChanged(e.key, val),
-                    ),
-                  )
-                  .toList(),
-        ),
-      ],
+    return DropdownButton<String>(
+      isExpanded: true,
+      value: value,
+      items:
+          items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+      onChanged: (v) => onChanged(v!),
     );
   }
 
@@ -552,39 +404,6 @@ class _TripPlannerPageState extends State<TripPlannerPage> {
           onChanged: onChanged,
         ),
       ],
-    );
-  }
-
-  Widget checkboxList(
-    String label,
-    Map<String, bool> items,
-    Function(String, bool) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        Wrap(
-          spacing: 10,
-          children:
-              items.entries
-                  .map(
-                    (e) => FilterChip(
-                      label: Text(e.key),
-                      selected: e.value,
-                      onSelected: (val) => onChanged(e.key, val),
-                    ),
-                  )
-                  .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget switchTile(String label, bool value, Function(bool) onChanged) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [Text(label), Switch(value: value, onChanged: onChanged)],
     );
   }
 

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -74,6 +76,7 @@ class AppDrawer extends StatelessWidget {
                 context.go('/bookmarks');
               },
             ),
+
             DrawerItem(
               icon: CupertinoIcons.car_detailed,
               title: 'Trip History',

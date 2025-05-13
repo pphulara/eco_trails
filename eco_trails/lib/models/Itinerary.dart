@@ -3,7 +3,7 @@ class ItineraryItem {
   final String city;
   final String locationName;
   final String type;
-  final double budgetEstimate;
+  final String budgetEstimate; // Changed to double
 
   ItineraryItem({
     required this.day,
@@ -21,11 +21,13 @@ class ItineraryItem {
       type: json['type'] ?? 'Unknown Type',
       // Handle both String and int types and convert to double
       budgetEstimate:
-          (json['budget_estimate'] is String
+          json['budget_estimate'] is String
               ? double.tryParse(json['budget_estimate']) ?? 0.0
               : json['budget_estimate'] is int
               ? (json['budget_estimate'] as int).toDouble()
-              : json['budget_estimate'] ?? 0.0),
+              : json['budget_estimate'] is double
+              ? json['budget_estimate']
+              : 0.0,
     );
   }
 }

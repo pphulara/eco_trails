@@ -23,10 +23,18 @@ class Place {
   });
 
   factory Place.fromFirestore(Map<String, dynamic> data) {
-    final geoPoint = data['location'] as GeoPoint;
+    final geoPointData = data['location'];
+    LatLng location;
+
+    if (geoPointData != null && geoPointData is GeoPoint) {
+      location = LatLng(geoPointData.latitude, geoPointData.longitude);
+    } else {
+      location = LatLng(0, 0);
+    }
+
     return Place(
       title: data['name'] ?? '',
-      location: LatLng(geoPoint.latitude, geoPoint.longitude),
+      location: location,
       description: data['description'] ?? '',
       crowd: data['crowd'] ?? 0,
       rating: (data['rating'] ?? 0).toDouble(),
